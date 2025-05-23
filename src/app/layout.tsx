@@ -17,7 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'VoiceMax - Voice that states your mental health',
   description: 'Analyze emotions in your voice with VoiceMax.',
-  icons: [], // Explicitly tell Next.js metadata to not handle/look for default icons
+  // Explicitly opt-out of Next.js automatic icon handling
+  // to prevent it from looking for favicon.ico or other defaults.
+  icons: null,
 };
 
 export default function RootLayout({
@@ -28,7 +30,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.png" type="image/png" />
+        {/* Manually add the link tag for the favicon */}
+        <link rel="icon" href="/favicon.png" type="image/png" sizes="any" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
