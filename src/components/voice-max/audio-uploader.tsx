@@ -41,6 +41,7 @@ export function AudioRecorder({
 
   useEffect(() => {
     if (parentAudioDataUri === null) { // Parent reset
+      // 1. Reset UI states first
       setInternalRecordedFile(null);
       setInternalRecordedDataUri(null);
       setMicError(null);
@@ -49,14 +50,26 @@ export function AudioRecorder({
         audioPlayerRef.current.pause();
         audioPlayerRef.current.src = '';
       }
+      setIsRecording(false); // Reset recording state early
 
+      // 2. Stop active MediaRecorder if any (its onstop should handle its stream)
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop(); // This will trigger onstop
-      } else if (audioStreamRef.current) {
+        mediaRecorderRef.current.stop(); 
+        // onstop will handle stopping tracks of audioStreamRef and nullifying audioStreamRef
+      }
+      
+      // 3. Clean up mediaRecorderRef itself and any independently held stream
+      if (mediaRecorderRef.current) {
+        // Stop tracks if mediaRecorder exists but wasn't recording, or as a safeguard
+        mediaRecorderRef.current.stream?.getTracks().forEach(track => track.stop());
+        mediaRecorderRef.current = null; // Nullify the recorder instance
+      }
+
+      // 4. Fallback cleanup for audioStreamRef if it was somehow orphaned
+      if (audioStreamRef.current) {
         audioStreamRef.current.getTracks().forEach(track => track.stop());
         audioStreamRef.current = null;
       }
-      setIsRecording(false); // Ensure recording state is also reset
     }
   }, [parentAudioDataUri]);
 
@@ -83,13 +96,15 @@ export function AudioRecorder({
   const requestMicPermission = async (): Promise<boolean> => {
     setMicError(null);
 
-    // Ensure any previous stream is stopped before requesting a new one.
+    // Ensure any previous stream from audioStreamRef is stopped.
     if (audioStreamRef.current) {
         audioStreamRef.current.getTracks().forEach(track => track.stop());
         audioStreamRef.current = null;
     }
-    if (mediaRecorderRef.current?.stream) {
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    // Ensure any stream associated with an old media recorder instance is stopped, and nullify the recorder.
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stream?.getTracks().forEach(track => track.stop());
+      mediaRecorderRef.current = null; // Nullify old recorder instance
     }
 
 
@@ -121,17 +136,21 @@ export function AudioRecorder({
   };
 
   const handleStartRecording = async () => {
+    // Reset file states and notify parent at the very beginning of a new recording attempt
+    setInternalRecordedFile(null);
+    setInternalRecordedDataUri(null);
+    setIsAudioPlaying(false); // Stop playback if any
+    if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = '';
+    }
+    onRecordingComplete(null, null);
+
     const permissionAndStreamObtained = await requestMicPermission();
 
     if (!permissionAndStreamObtained || !audioStreamRef.current) {
-      // requestMicPermission handles setting micError and toast if it fails.
       return;
     }
-
-    setInternalRecordedFile(null);
-    setInternalRecordedDataUri(null);
-    setIsAudioPlaying(false);
-    onRecordingComplete(null, null); // Notify parent about the reset/start
 
     audioChunksRef.current = [];
 
@@ -141,18 +160,20 @@ export function AudioRecorder({
       options.mimeType = 'audio/ogg';
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         console.warn(`${options.mimeType} is not supported, trying default`);
-        (options as any).mimeType = ''; // Fallback to browser default if specific types not supported
+        (options as any).mimeType = ''; 
       }
     }
 
-
     try {
+      // Ensure mediaRecorderRef is null before creating a new instance, requestMicPermission should handle this
       mediaRecorderRef.current = new MediaRecorder(audioStreamRef.current, options);
     } catch (e) {
       console.error("Error creating MediaRecorder:", e);
       const errorMsg = "Failed to create audio recorder. Your browser might not support the available audio formats or the microphone is already in use.";
       setMicError(errorMsg);
       toast({ variant: 'destructive', title: 'Recording Error', description: errorMsg });
+      audioStreamRef.current?.getTracks().forEach(track => track.stop()); // Clean up acquired stream
+      audioStreamRef.current = null;
       return;
     }
 
@@ -185,7 +206,6 @@ export function AudioRecorder({
       };
       reader.readAsDataURL(audioBlob);
 
-      // Stream tracks are stopped here after recording finishes and processing is done.
       audioStreamRef.current?.getTracks().forEach(track => track.stop());
       audioStreamRef.current = null;
     };
@@ -193,7 +213,6 @@ export function AudioRecorder({
     mediaRecorderRef.current.onerror = (event: Event) => {
         console.error('MediaRecorder error:', event);
         let errorMsg = 'An error occurred with the media recorder.';
-        // The event might be a MediaRecorderErrorEvent which has an 'error' property
         if ('error' in event && event.error instanceof Error) {
             errorMsg = `MediaRecorder error: ${event.error.name} - ${event.error.message}`;
         }
@@ -202,8 +221,8 @@ export function AudioRecorder({
         setIsRecording(false);
         audioStreamRef.current?.getTracks().forEach(track => track.stop());
         audioStreamRef.current = null;
+        mediaRecorderRef.current = null; // Nullify the failed recorder
     };
-
 
     mediaRecorderRef.current.start();
     setIsRecording(true);
@@ -212,7 +231,7 @@ export function AudioRecorder({
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      // onstop will handle track stopping
+      // onstop will handle track stopping and nullifying audioStreamRef
       setIsRecording(false);
     }
   };
@@ -234,13 +253,15 @@ export function AudioRecorder({
   };
 
   useEffect(() => {
-    // General cleanup for the component when it unmounts.
     return () => {
+      // General cleanup for the component when it unmounts.
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
       mediaRecorderRef.current?.stream?.getTracks().forEach(track => track.stop());
       audioStreamRef.current?.getTracks().forEach(track => track.stop());
+      mediaRecorderRef.current = null;
+      audioStreamRef.current = null;
     };
   }, []);
 
@@ -315,7 +336,7 @@ export function AudioRecorder({
           </Card>
         )}
 
-        {hasMicPermission === false && !micError && ( // Only show if no specific error message already exists
+        {hasMicPermission === false && !micError && ( 
           <Alert variant="destructive" className="mt-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Microphone Access Required</AlertTitle>
@@ -352,5 +373,4 @@ export function AudioRecorder({
     </Card>
   );
 }
-
     
