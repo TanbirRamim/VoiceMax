@@ -1,8 +1,8 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getEmotionIcon } from './icons';
-import type { LucideProps } from 'lucide-react';
 
 interface EmotionDisplayProps {
   emotion: string | null;
@@ -14,17 +14,17 @@ export function EmotionDisplay({ emotion }: EmotionDisplayProps) {
   const IconComponent = getEmotionIcon(emotion);
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle className="text-xl text-primary">Detected Primary Emotion</CardTitle>
+    <Card className="shadow-xl border-accent bg-card">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-2xl text-primary">Primary Emotion Detected</CardTitle>
       </CardHeader>
-      <CardContent className="text-center py-8">
+      <CardContent className="text-center py-6 sm:py-8">
         <IconComponent
-          className="h-20 w-20 mx-auto mb-4 text-accent"
+          className="h-24 w-24 sm:h-28 sm:w-28 mx-auto mb-4 text-accent"
           strokeWidth={1.5}
           aria-label={`${emotion} icon`}
         />
-        <p className="text-4xl font-semibold capitalize">{emotion}</p>
+        <p className="text-4xl sm:text-5xl font-semibold capitalize text-foreground">{emotion}</p>
       </CardContent>
     </Card>
   );

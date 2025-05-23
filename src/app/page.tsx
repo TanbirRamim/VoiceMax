@@ -35,7 +35,7 @@ export default function VoiceMaxPage() {
     setClientLoaded(true);
   }, []);
 
-  const handleRecordingComplete = (file: File, dataUri: string) => {
+  const handleRecordingComplete = (file: File | null, dataUri: string | null) => {
     setAudioFile(file);
     setAudioDataUri(dataUri);
     setAnalysisResult(null);
@@ -120,18 +120,18 @@ export default function VoiceMaxPage() {
   if (!clientLoaded) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-8 bg-background text-foreground">
-      <main className="w-full max-w-2xl space-y-8">
-        <header className="text-center">
-          <h1 className="text-5xl font-bold text-primary mb-2 tracking-tight">VoiceMax</h1>
-          <p className="text-xl text-muted-foreground">
-            Record your voice to unlock hidden emotions and insights.
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 bg-background text-foreground">
+      <main className="w-full max-w-2xl space-y-10">
+        <header className="text-center space-y-2">
+          <h1 className="text-5xl sm:text-6xl font-bold text-primary tracking-tight">VoiceMax</h1>
+          <p className="text-lg sm:text-xl text-muted-foreground">
+            Uncover the emotions in your voice. Gain insights, get feedback.
           </p>
         </header>
 
@@ -144,10 +144,11 @@ export default function VoiceMaxPage() {
         />
 
         {isLoading && !analysisResult && ( 
-          <Card className="w-full shadow-lg">
-            <CardContent className="flex flex-col items-center justify-center p-10 space-y-3">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground">Analyzing your voice... this may take a moment.</p>
+          <Card className="w-full shadow-xl border-primary/30">
+            <CardContent className="flex flex-col items-center justify-center p-10 space-y-4">
+              <Loader2 className="h-14 w-14 animate-spin text-primary" />
+              <p className="text-lg text-muted-foreground">Analyzing your voice...</p>
+              <p className="text-sm text-muted-foreground/80">This may take a moment.</p>
             </CardContent>
           </Card>
         )}
@@ -169,7 +170,7 @@ export default function VoiceMaxPage() {
                 primaryEmotion={analysisResult.primaryEmotion}
               />
             )}
-             <Button onClick={resetState} variant="outline" className="w-full">
+             <Button onClick={resetState} variant="outline" className="w-full py-3 text-base hover:bg-primary/10 hover:border-primary">
               <RefreshCcw className="mr-2 h-4 w-4" /> Record New Audio
             </Button>
           </div>
@@ -179,10 +180,10 @@ export default function VoiceMaxPage() {
       
       <style jsx global>{`
         .animate-fadeIn {
-          animation: fadeIn 0.5s ease-in-out;
+          animation: fadeIn 0.7s ease-in-out;
         }
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
+          from { opacity: 0; transform: translateY(15px); }
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>

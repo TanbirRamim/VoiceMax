@@ -1,6 +1,7 @@
+
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Lightbulb } from 'lucide-react';
 
@@ -14,18 +15,20 @@ export function EmotionSuggestions({ suggestions }: EmotionSuggestionsProps) {
   }
 
   return (
-    <Card className="shadow-md">
+    <Card className="shadow-lg border-border/50">
       <CardHeader>
-        <CardTitle className="text-xl text-primary flex items-center gap-2">
-          <Lightbulb className="h-6 w-6" />
+        <CardTitle className="text-2xl text-primary flex items-center gap-2">
+          <Lightbulb className="h-7 w-7" />
           Additional Insights
         </CardTitle>
+        <CardDescription className="text-base pt-1">
+          The AI also detected hints of the following:
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="mb-3 text-muted-foreground">You might also be feeling hints of:</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           {suggestions.map((suggestion, index) => (
-            <Badge key={index} variant="secondary" className="text-base px-3 py-1 bg-accent/20 text-accent-foreground border-accent">
+            <Badge key={index} variant="secondary" className="text-base px-4 py-1.5 bg-secondary/80 text-secondary-foreground border-secondary hover:bg-secondary">
               {suggestion}
             </Badge>
           ))}

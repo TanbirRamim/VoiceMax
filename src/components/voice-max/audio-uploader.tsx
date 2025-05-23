@@ -55,13 +55,16 @@ export function AudioRecorder({
   useEffect(() => {
     const audioElement = audioPlayerRef.current;
     if (audioElement) {
+      const handleAudioPlay = () => setIsAudioPlaying(true);
       const handleAudioPause = () => setIsAudioPlaying(false);
       const handleAudioEnded = () => setIsAudioPlaying(false);
 
+      audioElement.addEventListener('play', handleAudioPlay);
       audioElement.addEventListener('pause', handleAudioPause);
       audioElement.addEventListener('ended', handleAudioEnded);
 
       return () => {
+        audioElement.removeEventListener('play', handleAudioPlay);
         audioElement.removeEventListener('pause', handleAudioPause);
         audioElement.removeEventListener('ended', handleAudioEnded);
       };
@@ -175,17 +178,12 @@ export function AudioRecorder({
     if (audioPlayerRef.current && internalRecordedDataUri) {
       if (isAudioPlaying) {
         audioPlayerRef.current.pause();
-        setIsAudioPlaying(false);
       } else {
-        // Ensure src is set before playing, especially if reset happened
         if (audioPlayerRef.current.src !== internalRecordedDataUri) {
             audioPlayerRef.current.src = internalRecordedDataUri;
         }
-        audioPlayerRef.current.play().then(() => {
-            setIsAudioPlaying(true);
-        }).catch(e => {
+        audioPlayerRef.current.play().catch(e => {
             console.error("Error playing audio:", e);
-            setIsAudioPlaying(false); // Reset state if play fails
             toast({variant: 'destructive', title: 'Playback Error', description: 'Could not play the audio.'})
         });
       }
@@ -202,23 +200,23 @@ export function AudioRecorder({
   const displayError = micError || analysisError;
 
   return (
-    <Card className="w-full shadow-lg">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-2xl">
-          <Mic className="h-7 w-7 text-primary" />
+    <Card className="w-full shadow-xl border-primary/30">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-2xl text-primary">
+          <Mic className="h-7 w-7" />
           Record Your Voice
         </CardTitle>
-        <CardDescription>
-          Click "Start Recording" and speak into your microphone.
+        <CardDescription className="text-base">
+          Click "Start Recording", speak clearly, and then click "Stop Recording".
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 pt-2">
         <div className="flex flex-col items-center space-y-4">
           {!isRecording ? (
             <Button
               onClick={handleStartRecording}
-              disabled={isLoading}
-              className="w-full py-3 text-base"
+              disabled={isLoading || isAudioPlaying}
+              className="w-full py-3 text-lg"
               size="lg"
             >
               <Mic className="mr-2 h-5 w-5" />
@@ -228,7 +226,7 @@ export function AudioRecorder({
             <Button
               onClick={handleStopRecording}
               variant="destructive"
-              className="w-full py-3 text-base"
+              className="w-full py-3 text-lg"
               size="lg"
             >
               <Square className="mr-2 h-5 w-5" />
@@ -236,7 +234,7 @@ export function AudioRecorder({
             </Button>
           )}
           {isRecording && (
-            <div className="flex items-center text-destructive animate-pulse">
+            <div className="flex items-center text-red-500 animate-pulse font-medium">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Recording...
             </div>
@@ -244,20 +242,26 @@ export function AudioRecorder({
         </div>
 
         {internalRecordedFile && internalRecordedDataUri && !isRecording && (
-          <Card className="p-4 bg-secondary/20 border border-secondary">
-            <CardTitle className="text-lg mb-2 flex items-center">
+          <Card className="p-4 bg-card border border-border/50">
+            <CardTitle className="text-lg mb-2 flex items-center text-foreground">
               <FileAudio className="h-5 w-5 mr-2 text-accent" />
-              Recording Saved
+              Your Recording
             </CardTitle>
-            <CardDescription className="text-sm mb-3">
-              Your voice has been recorded. You can play it back or proceed to analysis.
+            <CardDescription className="text-sm mb-3 text-muted-foreground">
+              Listen to your recording or proceed with analysis.
             </CardDescription>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium">{internalRecordedFile.name}</span>
+              <span className="text-sm font-medium text-foreground">{internalRecordedFile.name}</span>
               <span className="text-xs text-muted-foreground">({(internalRecordedFile.size / 1024).toFixed(1)} KB)</span>
             </div>
             <audio ref={audioPlayerRef} className="hidden" />
-            <Button onClick={handleTogglePlayPauseRecording} variant="outline" size="sm" className="w-full mb-3">
+            <Button 
+              onClick={handleTogglePlayPauseRecording} 
+              variant="outline" 
+              size="sm" 
+              className="w-full mb-3 hover:bg-accent/10 hover:text-accent-foreground"
+              disabled={isLoading}
+            >
               {isAudioPlaying ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
               {isAudioPlaying ? 'Pause Recording' : 'Play Recording'}
             </Button>
@@ -265,33 +269,33 @@ export function AudioRecorder({
         )}
 
         {hasMicPermission === false && !micError && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mt-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Microphone Access Required</AlertTitle>
             <AlertDescription>
-              This app needs access to your microphone to record audio.
-              Please enable microphone permissions in your browser settings and refresh the page.
+              This app needs access to your microphone. Please enable it in your browser settings and refresh.
             </AlertDescription>
           </Alert>
         )}
 
         {displayError && (
-          <div className="p-3 bg-destructive/20 border border-destructive text-destructive rounded-md text-sm flex items-center gap-2">
-            <AlertCircle className="h-5 w-5" />
-            <span>{displayError}</span>
-          </div>
+          <Alert variant="destructive" className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>An Error Occurred</AlertTitle>
+            <AlertDescription>{displayError}</AlertDescription>
+          </Alert>
         )}
 
         <Button
           onClick={onAnalyzeRequest}
           disabled={!internalRecordedDataUri || isLoading || !!micError || isRecording || isAudioPlaying}
-          className="w-full text-lg py-6"
+          className="w-full text-xl py-6"
           size="lg"
         >
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Analyzing...
+              <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+              Analyzing Voice...
             </>
           ) : (
             'Analyze Voice'
