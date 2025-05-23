@@ -81,7 +81,32 @@ body {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground; /* Tailwind class providing base background color */
     min-height: 100vh;
+    
+    /* Added for wave animation */
+    background-image: linear-gradient(
+      135deg, 
+      hsl(203, 29%, 16%), /* Slightly darker shade of background */
+      hsl(var(--background)),
+      hsl(203, 29%, 21%), /* Slightly lighter shade of background */
+      hsl(var(--background)),
+      hsl(203, 29%, 16%)
+    );
+    background-size: 300% 300%; /* Large size for smooth animation */
+    animation: waveBackground 25s ease infinite;
+  }
+}
+
+/* Added for wave animation */
+@keyframes waveBackground {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
   }
 }
