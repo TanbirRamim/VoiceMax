@@ -91,7 +91,15 @@ export default function VoiceMaxPage() {
 
     } catch (err: any) {
       console.error('Analysis failed:', err);
-      setAnalysisError(err.message || 'An unknown error occurred during analysis.');
+      let userFriendlyError = 'An unknown error occurred during analysis.';
+      if (err.message && (err.message.includes('429 Too Many Requests') || err.message.includes('QuotaFailure') || err.message.includes('rate limit'))) {
+        userFriendlyError = 'Analysis failed due to API rate limits. You may have exceeded the free tier usage. Please try again in a few moments or check your Google Cloud project plan and billing details.';
+      } else if (err.message) {
+        // Try to extract a cleaner message if possible, otherwise use the full one
+        const match = err.message.match(/\[\d{3} .*?\] (.*)/);
+        userFriendlyError = match && match[1] ? match[1].split('.')[0] : err.message;
+      }
+      setAnalysisError(userFriendlyError);
       setAnalysisResult(null);
     } finally {
       setIsLoading(false);
