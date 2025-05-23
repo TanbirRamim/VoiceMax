@@ -51,7 +51,9 @@ export default function VoiceMaxPage() {
 
     setIsLoading(true);
     setAnalysisError(null);
-    setAnalysisResult(null);
+    // Keep previous analysisResult visible briefly if user re-analyzes, or clear it:
+    // setAnalysisResult(null); // Option 1: Clear immediately
+    // Option 2 (current): Let new results overwrite, loading indicator shows regardless.
 
     try {
       // 1. Analyze primary emotion, stress, and speech
@@ -63,14 +65,14 @@ export default function VoiceMaxPage() {
         throw new Error('Could not detect primary emotion.');
       }
       
-      setAnalysisResult(prev => ({
+      // Set initial part of the result, this will be updated by subsequent calls
+      let currentResult: Partial<AnalysisResult> = {
         primaryEmotion,
         perceivedStressLevel,
         speechCharacteristics,
-        suggestedEmotions: [], 
+        suggestedEmotions: [],
         feedbackText: '',
-        ...(prev || {}) 
-      }));
+      };
 
       // 2. Suggest additional emotions
       const suggestionsInput: SuggestAdditionalEmotionsInput = {
@@ -79,20 +81,22 @@ export default function VoiceMaxPage() {
       };
       const suggestionsOutput: SuggestAdditionalEmotionsOutput = await suggestAdditionalEmotions(suggestionsInput);
       
-      setAnalysisResult(prev => ({
-        ...prev!,
+      currentResult = {
+        ...currentResult,
         suggestedEmotions: suggestionsOutput.suggestedEmotions || [],
-      }));
+      };
 
       // 3. Provide personalized feedback
       const feedbackInput: ProvidePersonalizedFeedbackInput = { emotion: primaryEmotion };
       const feedbackOutput: ProvidePersonalizedFeedbackOutput = await providePersonalizedFeedback(feedbackInput);
 
-      setAnalysisResult(prev => ({
-        ...prev!,
+      currentResult = {
+        ...currentResult,
         feedbackText: feedbackOutput.feedback,
         feedbackSuggestion: feedbackOutput.suggestion,
-      }));
+      };
+
+      setAnalysisResult(currentResult as AnalysisResult);
 
     } catch (err: any) {
       console.error('Analysis failed:', err);
@@ -147,7 +151,7 @@ export default function VoiceMaxPage() {
                 parentAudioDataUri={audioDataUri} 
               />
 
-              {isLoading && !analysisResult && ( 
+              {isLoading && ( 
                 <Card className="w-full shadow-xl border-primary/30">
                   <CardContent className="flex flex-col items-center justify-center p-10 space-y-4">
                     <Loader2 className="h-14 w-14 animate-spin text-primary" />
