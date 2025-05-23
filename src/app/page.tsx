@@ -4,8 +4,9 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCcw } from 'lucide-react';
-import { AudioRecorder } from '@/components/voice-max/audio-uploader'; // Renamed for clarity
+import { AudioRecorder } from '@/components/voice-max/audio-uploader';
 import { EmotionDisplay } from '@/components/voice-max/emotion-display';
+import { DetailedObservations } from '@/components/voice-max/detailed-observations';
 import { EmotionSuggestions } from '@/components/voice-max/emotion-suggestions';
 import { FeedbackDisplay } from '@/components/voice-max/feedback-display';
 import { analyzeAudioEmotion, AnalyzeAudioEmotionInput, AnalyzeAudioEmotionOutput } from '@/ai/flows/analyze-audio-emotion';
@@ -15,14 +16,16 @@ import { Card, CardContent } from '@/components/ui/card';
 
 interface AnalysisResult {
   primaryEmotion: string;
+  perceivedStressLevel: string;
+  speechCharacteristics: string;
   suggestedEmotions: string[];
   feedbackText: string;
   feedbackSuggestion?: string;
 }
 
 export default function VoiceMaxPage() {
-  const [audioFile, setAudioFile] = useState<File | null>(null); // Will hold the recorded audio File object
-  const [audioDataUri, setAudioDataUri] = useState<string | null>(null); // Will hold the recorded audio data URI
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioDataUri, setAudioDataUri] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -35,8 +38,8 @@ export default function VoiceMaxPage() {
   const handleRecordingComplete = (file: File, dataUri: string) => {
     setAudioFile(file);
     setAudioDataUri(dataUri);
-    setAnalysisResult(null); // Reset previous results
-    setAnalysisError(null); // Reset previous errors
+    setAnalysisResult(null);
+    setAnalysisError(null);
   };
 
   const handleAnalyzeRequest = async () => {
@@ -50,27 +53,28 @@ export default function VoiceMaxPage() {
     setAnalysisResult(null);
 
     try {
-      // 1. Analyze primary emotion
+      // 1. Analyze primary emotion, stress, and speech
       const emotionInput: AnalyzeAudioEmotionInput = { audioDataUri };
       const emotionOutput: AnalyzeAudioEmotionOutput = await analyzeAudioEmotion(emotionInput);
-      const primaryEmotion = emotionOutput.primaryEmotion;
+      const { primaryEmotion, perceivedStressLevel, speechCharacteristics } = emotionOutput;
 
       if (!primaryEmotion) {
         throw new Error('Could not detect primary emotion.');
       }
       
-      // Set intermediate result for primary emotion first
       setAnalysisResult(prev => ({
         primaryEmotion,
+        perceivedStressLevel,
+        speechCharacteristics,
         suggestedEmotions: [], 
         feedbackText: '',
-        ...(prev || {}) // Spread previous if it existed, though it's reset above
+        ...(prev || {}) 
       }));
 
       // 2. Suggest additional emotions
       const suggestionsInput: SuggestAdditionalEmotionsInput = {
         primaryEmotion,
-        audioAnalysisContext: `The primary emotion detected from the audio recording is "${primaryEmotion}". Consider the nuances that might accompany this emotion in spoken voice.`,
+        audioAnalysisContext: `The primary emotion detected is "${primaryEmotion}". The voice also showed signs of "${perceivedStressLevel}" stress, and speech characteristics were noted as "${speechCharacteristics}". Consider nuances.`,
       };
       const suggestionsOutput: SuggestAdditionalEmotionsOutput = await suggestAdditionalEmotions(suggestionsInput);
       
@@ -92,10 +96,9 @@ export default function VoiceMaxPage() {
     } catch (err: any) {
       console.error('Analysis failed:', err);
       let userFriendlyError = 'An unknown error occurred during analysis.';
-      if (err.message && (err.message.includes('429 Too Many Requests') || err.message.includes('QuotaFailure') || err.message.includes('rate limit'))) {
+       if (err.message && (err.message.includes('429 Too Many Requests') || err.message.includes('QuotaFailure') || err.message.includes('rate limit'))) {
         userFriendlyError = 'Analysis failed due to API rate limits. You may have exceeded the free tier usage. Please try again in a few moments or check your Google Cloud project plan and billing details.';
       } else if (err.message) {
-        // Try to extract a cleaner message if possible, otherwise use the full one
         const match = err.message.match(/\[\d{3} .*?\] (.*)/);
         userFriendlyError = match && match[1] ? match[1].split('.')[0] : err.message;
       }
@@ -108,7 +111,7 @@ export default function VoiceMaxPage() {
 
   const resetState = () => {
     setAudioFile(null);
-    setAudioDataUri(null); // This will trigger reset in AudioRecorder via prop
+    setAudioDataUri(null); 
     setAnalysisResult(null);
     setAnalysisError(null);
     setIsLoading(false);
@@ -128,7 +131,7 @@ export default function VoiceMaxPage() {
         <header className="text-center">
           <h1 className="text-5xl font-bold text-primary mb-2 tracking-tight">VoiceMax</h1>
           <p className="text-xl text-muted-foreground">
-            Record your voice to unlock hidden emotions.
+            Record your voice to unlock hidden emotions and insights.
           </p>
         </header>
 
@@ -137,10 +140,10 @@ export default function VoiceMaxPage() {
           onAnalyzeRequest={handleAnalyzeRequest}
           isLoading={isLoading}
           analysisError={analysisError}
-          parentAudioDataUri={audioDataUri} // Used to trigger reset in child
+          parentAudioDataUri={audioDataUri} 
         />
 
-        {isLoading && !analysisResult && ( // Show loading only if no partial results yet
+        {isLoading && !analysisResult && ( 
           <Card className="w-full shadow-lg">
             <CardContent className="flex flex-col items-center justify-center p-10 space-y-3">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -152,6 +155,10 @@ export default function VoiceMaxPage() {
         {!isLoading && analysisResult && (
           <div className="space-y-6 animate-fadeIn">
             <EmotionDisplay emotion={analysisResult.primaryEmotion} />
+            <DetailedObservations
+              stressLevel={analysisResult.perceivedStressLevel}
+              speechCharacteristics={analysisResult.speechCharacteristics}
+            />
             {analysisResult.suggestedEmotions && analysisResult.suggestedEmotions.length > 0 && (
               <EmotionSuggestions suggestions={analysisResult.suggestedEmotions} />
             )}
@@ -169,9 +176,7 @@ export default function VoiceMaxPage() {
         )}
         
       </main>
-      <footer className="text-center mt-12 text-sm text-muted-foreground/70">
-        
-      </footer>
+      
       <style jsx global>{`
         .animate-fadeIn {
           animation: fadeIn 0.5s ease-in-out;
