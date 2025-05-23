@@ -1,5 +1,5 @@
 
-import type { Metadata, IconDescriptor } from 'next'; // Added IconDescriptor
+import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
@@ -14,23 +14,10 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-const faviconDescriptors: IconDescriptor[] = [
-  {
-    url: '/favicon.png', // Next.js serves src/app/favicon.png at /favicon.png
-    type: 'image/png',
-    sizes: 'any', // Or you can specify exact sizes like '32x32'
-  },
-];
-
 export const metadata: Metadata = {
   title: 'VoiceMax - Voice that states your mental health',
   description: 'Analyze emotions in your voice with VoiceMax.',
-  icons: {
-    icon: faviconDescriptors, // Using the more explicit IconDescriptor array
-    // You can also add other icon types here if needed:
-    // apple: '/apple-icon.png',
-    // shortcut: '/shortcut-icon.png',
-  },
+  icons: null, // Explicitly prevent Next.js from automatic icon handling
 };
 
 export default function RootLayout({
@@ -41,7 +28,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Metadata API will handle link tag generation */}
+        {/* Any manual favicon link would go here if 'icons: null' isn't sufficient,
+            but for now, we are trying to disable all favicon processing to stop the error.
+            If you have a favicon.png at src/app/favicon.png, and this doesn't stop the error,
+            you might later re-add: <link rel="icon" href="/favicon.png" type="image/png" />
+            while keeping icons: null.
+        */}
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
