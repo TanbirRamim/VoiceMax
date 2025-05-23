@@ -18,13 +18,14 @@ export function FeedbackDisplay({ feedbackText, suggestion, primaryEmotion }: Fe
   // List of distinctly positive emotions
   const positiveEmotions = [
     'happy', 'joy', 'elated', 'excited', 'content', 
-    'pleased', 'grateful', 'hopeful', 'love', 'amusement'
+    'pleased', 'grateful', 'hopeful', 'love', 'amusement', 'calm' // Added calm as positive here
   ];
 
-  // Determine if the emotion is NOT positive (i.e., it's negative or neutral)
-  const showSeekSupportSection = primaryEmotion && !positiveEmotions.includes(primaryEmotion.toLowerCase());
+  // Determine if the emotion is NOT strictly positive (i.e., it's negative or neutral)
+  const showSeekSupportSection = primaryEmotion && 
+                               !positiveEmotions.includes(primaryEmotion.toLowerCase());
 
-  // Determine if the suggestion is specifically a coping/breathing exercise (typically for negative emotions)
+  // Determine if the suggestion is specifically a coping/breathing exercise
   const isCopingExerciseSuggestion = suggestion && (
     suggestion.toLowerCase().includes('breathing') ||
     suggestion.toLowerCase().includes('inhale') ||
@@ -71,12 +72,12 @@ export function FeedbackDisplay({ feedbackText, suggestion, primaryEmotion }: Fe
               <Button
                 variant="destructive"
                 className="w-full sm:w-auto"
-                onClick={() => window.open('https://www.google.com/search?q=free+mental+health+helpline+near+me', '_blank')}
+                onClick={() => window.open('https://www.google.com/search?q=free+mental+health+helpline+near+me&hl=en&lr=lang_en', '_blank')}
               >
                 <LifeBuoy className="mr-2 h-4 w-4" /> Find Support Resources
               </Button>
               <p className="text-xs text-muted-foreground pt-1">
-                This will open a Google search for resources in your area. VoiceMax is not a replacement for professional advice.
+                This will open a Google search for resources. VoiceMax is not a replacement for professional advice.
               </p>
             </AlertDescription>
           </Alert>
