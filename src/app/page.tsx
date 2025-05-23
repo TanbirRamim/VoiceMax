@@ -53,9 +53,7 @@ export default function VoiceMaxPage() {
 
     setIsLoading(true);
     setAnalysisError(null);
-    // Keep previous analysisResult visible briefly if user re-analyzes, or clear it:
-    // setAnalysisResult(null); // Option 1: Clear immediately
-    // Option 2 (current): Let new results overwrite, loading indicator shows regardless.
+    
 
     try {
       // 1. Analyze primary emotion, stress, speech, confidence, and energy
@@ -67,7 +65,6 @@ export default function VoiceMaxPage() {
         throw new Error('Could not detect primary emotion.');
       }
       
-      // Set initial part of the result, this will be updated by subsequent calls
       let currentResult: Partial<AnalysisResult> = {
         primaryEmotion,
         perceivedStressLevel,
@@ -77,6 +74,7 @@ export default function VoiceMaxPage() {
         suggestedEmotions: [],
         feedbackText: '',
       };
+      setAnalysisResult(currentResult as AnalysisResult); // Show partial results sooner
 
       // 2. Suggest additional emotions
       const suggestionsInput: SuggestAdditionalEmotionsInput = {
@@ -89,6 +87,7 @@ export default function VoiceMaxPage() {
         ...currentResult,
         suggestedEmotions: suggestionsOutput.suggestedEmotions || [],
       };
+      setAnalysisResult(currentResult as AnalysisResult); // Update with more results
 
       // 3. Provide personalized feedback
       const feedbackInput: ProvidePersonalizedFeedbackInput = { emotion: primaryEmotion };
@@ -105,14 +104,21 @@ export default function VoiceMaxPage() {
     } catch (err: any) {
       console.error('Analysis failed:', err);
       let userFriendlyError = 'An unknown error occurred during analysis.';
-       if (err.message && (err.message.includes('429 Too Many Requests') || err.message.includes('QuotaFailure') || err.message.includes('rate limit'))) {
-        userFriendlyError = 'Analysis failed due to API rate limits. You may have exceeded the free tier usage. Please try again in a few moments or check your Google Cloud project plan and billing details.';
-      } else if (err.message) {
-        const match = err.message.match(/\\[\\d{3} .*?\\] (.*)/);
-        userFriendlyError = match && match[1] ? match[1].split('.')[0] : err.message;
+      if (err.message) {
+        if (err.message.includes('429 Too Many Requests') || err.message.includes('QuotaFailure') || err.message.includes('rate limit')) {
+          userFriendlyError = 'Analysis failed due to API rate limits. You may have exceeded the free tier usage. Please try again in a few moments or check your Google Cloud project plan and billing details.';
+        } else if (err.message.includes('400 Bad Request') || err.message.toLowerCase().includes('invalid argument')) {
+          userFriendlyError = 'Analysis failed: The recorded audio might be too short, silent, corrupted, or in a format the AI could not process. Please try recording again clearly and for a few seconds.';
+        } else {
+          // Try to extract a more specific message if available, otherwise use the raw message
+          const match = err.message.match(/\[\d{3} .*?\] (.*)/); 
+          let extractedMessage = match && match[1] ? match[1].split('.')[0] : err.message;
+          if (extractedMessage.length > 200) extractedMessage = "An error occurred during analysis. Please try again." // Cap length
+          userFriendlyError = extractedMessage;
+        }
       }
       setAnalysisError(userFriendlyError);
-      setAnalysisResult(null);
+      setAnalysisResult(null); // Clear results on error
     } finally {
       setIsLoading(false);
     }
@@ -160,7 +166,7 @@ export default function VoiceMaxPage() {
                   <CardContent className="flex flex-col items-center justify-center p-10 space-y-4">
                     <Loader2 className="h-14 w-14 animate-spin text-primary" />
                     <p className="text-lg text-muted-foreground">Analyzing your voice...</p>
-                    <p className="text-sm text-muted-foreground/80">This may take a moment.</p>
+                    <p className="text-sm text-muted-foreground/80">This may take a moment, especially for the first analysis.</p>
                   </CardContent>
                 </Card>
               )}
