@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview Analyzes uploaded audio to detect the primary emotion expressed,
- * perceived stress level, and notable speech characteristics.
+ * perceived stress level, speech characteristics, confidence, and vocal energy.
  *
  * - analyzeAudioEmotion - A function that handles the audio emotion analysis process.
  * - AnalyzeAudioEmotionInput - The input type for the analyzeAudioEmotion function.
@@ -26,6 +26,8 @@ const AnalyzeAudioEmotionOutputSchema = z.object({
   primaryEmotion: z.string().describe('The primary emotion expressed in the audio.'),
   perceivedStressLevel: z.string().describe('A qualitative description of the perceived stress level in the voice (e.g., calm, moderate stress, high tension).'),
   speechCharacteristics: z.string().describe('Observations about speech patterns like pace, pauses, or fluency (e.g., fluid and confident, some hesitation, frequent pauses, rapid pace).'),
+  perceivedConfidence: z.string().describe("Description of the speaker's perceived confidence (e.g., confident and assertive, somewhat hesitant, appears unsure)."),
+  vocalEnergy: z.string().describe("Qualitative assessment of the vocal energy or enthusiasm conveyed (e.g., high energy, moderate, low energy/flat)."),
 });
 export type AnalyzeAudioEmotionOutput = z.infer<typeof AnalyzeAudioEmotionOutputSchema>;
 
@@ -38,8 +40,11 @@ const prompt = ai.definePrompt({
   input: {schema: AnalyzeAudioEmotionInputSchema},
   output: {schema: AnalyzeAudioEmotionOutputSchema},
   prompt: `Analyze the audio and detect the primary emotion expressed in it.
-Also, provide a qualitative assessment of the perceived stress level (e.g., calm, moderate signs of stress, high tension)
-and any notable speech characteristics (e.g., fluid and confident, some hesitation noted, frequent pauses, rapid pace with few pauses).
+Also, provide:
+1. A qualitative assessment of the perceived stress level (e.g., calm, moderate signs of stress, high tension).
+2. Any notable speech characteristics (e.g., fluid and confident, some hesitation noted, frequent pauses, rapid pace with few pauses).
+3. A description of the speaker's perceived confidence (e.g., confident and assertive, somewhat hesitant, appears unsure).
+4. A qualitative assessment of the vocal energy or enthusiasm conveyed (e.g., high energy, moderate, low energy/flat).
 
 Audio: {{media url=audioDataUri}}`,
 });

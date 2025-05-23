@@ -19,6 +19,8 @@ interface AnalysisResult {
   primaryEmotion: string;
   perceivedStressLevel: string;
   speechCharacteristics: string;
+  perceivedConfidence: string;
+  vocalEnergy: string;
   suggestedEmotions: string[];
   feedbackText: string;
   feedbackSuggestion?: string;
@@ -56,10 +58,10 @@ export default function VoiceMaxPage() {
     // Option 2 (current): Let new results overwrite, loading indicator shows regardless.
 
     try {
-      // 1. Analyze primary emotion, stress, and speech
+      // 1. Analyze primary emotion, stress, speech, confidence, and energy
       const emotionInput: AnalyzeAudioEmotionInput = { audioDataUri };
       const emotionOutput: AnalyzeAudioEmotionOutput = await analyzeAudioEmotion(emotionInput);
-      const { primaryEmotion, perceivedStressLevel, speechCharacteristics } = emotionOutput;
+      const { primaryEmotion, perceivedStressLevel, speechCharacteristics, perceivedConfidence, vocalEnergy } = emotionOutput;
 
       if (!primaryEmotion) {
         throw new Error('Could not detect primary emotion.');
@@ -70,6 +72,8 @@ export default function VoiceMaxPage() {
         primaryEmotion,
         perceivedStressLevel,
         speechCharacteristics,
+        perceivedConfidence,
+        vocalEnergy,
         suggestedEmotions: [],
         feedbackText: '',
       };
@@ -77,7 +81,7 @@ export default function VoiceMaxPage() {
       // 2. Suggest additional emotions
       const suggestionsInput: SuggestAdditionalEmotionsInput = {
         primaryEmotion,
-        audioAnalysisContext: `The primary emotion detected is "${primaryEmotion}". The voice also showed signs of "${perceivedStressLevel}" stress, and speech characteristics were noted as "${speechCharacteristics}". Consider nuances.`,
+        audioAnalysisContext: `The primary emotion detected is "${primaryEmotion}". The voice also showed signs of "${perceivedStressLevel}" stress, speech characteristics were noted as "${speechCharacteristics}", perceived confidence as "${perceivedConfidence}", and vocal energy as "${vocalEnergy}". Consider nuances.`,
       };
       const suggestionsOutput: SuggestAdditionalEmotionsOutput = await suggestAdditionalEmotions(suggestionsInput);
       
@@ -167,6 +171,8 @@ export default function VoiceMaxPage() {
                   <DetailedObservations
                     stressLevel={analysisResult.perceivedStressLevel}
                     speechCharacteristics={analysisResult.speechCharacteristics}
+                    confidenceLevel={analysisResult.perceivedConfidence}
+                    vocalEnergy={analysisResult.vocalEnergy}
                   />
                   {analysisResult.suggestedEmotions && analysisResult.suggestedEmotions.length > 0 && (
                     <EmotionSuggestions suggestions={analysisResult.suggestedEmotions} />
