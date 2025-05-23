@@ -40,7 +40,7 @@ export function AudioRecorder({
   const { toast } = useToast();
 
   useEffect(() => {
-    if (parentAudioDataUri === null) {
+    if (parentAudioDataUri === null) { // Parent reset
       setInternalRecordedFile(null);
       setInternalRecordedDataUri(null);
       setMicError(null);
@@ -49,6 +49,14 @@ export function AudioRecorder({
         audioPlayerRef.current.pause();
         audioPlayerRef.current.src = '';
       }
+
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop(); // This will trigger onstop
+      } else if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+        audioStreamRef.current = null;
+      }
+      setIsRecording(false); // Ensure recording state is also reset
     }
   }, [parentAudioDataUri]);
 
@@ -74,6 +82,17 @@ export function AudioRecorder({
 
   const requestMicPermission = async (): Promise<boolean> => {
     setMicError(null);
+
+    // Ensure any previous stream is stopped before requesting a new one.
+    if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+        audioStreamRef.current = null;
+    }
+    if (mediaRecorderRef.current?.stream) {
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+
+
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setMicError('Media devices API not available in this browser.');
       toast({ variant: 'destructive', title: 'Error', description: 'Audio recording is not supported by your browser.' });
@@ -86,47 +105,54 @@ export function AudioRecorder({
       return true;
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      const errorMsg = 'Microphone access denied. Please enable it in your browser settings.';
+      let errorMsg = 'Microphone access denied. Please enable it in your browser settings.';
+      if (error instanceof Error && error.name === 'NotAllowedError') {
+        errorMsg = 'Microphone access was denied. Please enable permissions in your browser settings and try again.';
+      } else if (error instanceof Error && error.name === 'NotFoundError') {
+        errorMsg = 'No microphone found. Please ensure a microphone is connected and enabled.';
+      } else if (error instanceof Error) {
+        errorMsg = `Could not access microphone: ${error.message}. Check browser settings.`;
+      }
       setMicError(errorMsg);
-      toast({ variant: 'destructive', title: 'Microphone Access Denied', description: 'Please enable microphone permissions in your browser settings.' });
+      toast({ variant: 'destructive', title: 'Microphone Error', description: errorMsg });
       setHasMicPermission(false);
       return false;
     }
   };
 
   const handleStartRecording = async () => {
-    let permissionGranted = hasMicPermission;
-    if (permissionGranted === null || permissionGranted === false) {
-      permissionGranted = await requestMicPermission();
-    }
+    const permissionAndStreamObtained = await requestMicPermission();
 
-    if (!permissionGranted || !audioStreamRef.current) {
+    if (!permissionAndStreamObtained || !audioStreamRef.current) {
+      // requestMicPermission handles setting micError and toast if it fails.
       return;
     }
 
     setInternalRecordedFile(null);
     setInternalRecordedDataUri(null);
     setIsAudioPlaying(false);
-    onRecordingComplete(null, null);
+    onRecordingComplete(null, null); // Notify parent about the reset/start
 
     audioChunksRef.current = [];
 
-    const options = { mimeType: 'audio/webm' };
-    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+    let options = { mimeType: 'audio/webm' };
+    if (MediaRecorder.isTypeSupported && !MediaRecorder.isTypeSupported(options.mimeType)) {
       console.warn(`${options.mimeType} is not supported, trying audio/ogg`);
       options.mimeType = 'audio/ogg';
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         console.warn(`${options.mimeType} is not supported, trying default`);
-        (options as any).mimeType = '';
+        (options as any).mimeType = ''; // Fallback to browser default if specific types not supported
       }
     }
+
 
     try {
       mediaRecorderRef.current = new MediaRecorder(audioStreamRef.current, options);
     } catch (e) {
       console.error("Error creating MediaRecorder:", e);
-      setMicError("Failed to create audio recorder. Your browser might not support the available audio formats.");
-      toast({ variant: 'destructive', title: 'Recording Error', description: "Could not initialize audio recorder." });
+      const errorMsg = "Failed to create audio recorder. Your browser might not support the available audio formats or the microphone is already in use.";
+      setMicError(errorMsg);
+      toast({ variant: 'destructive', title: 'Recording Error', description: errorMsg });
       return;
     }
 
@@ -138,7 +164,7 @@ export function AudioRecorder({
 
     mediaRecorderRef.current.onstop = async () => {
       const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || 'audio/webm' });
-      const fileName = `recording.${audioBlob.type.split('/')[1] || 'webm'}`;
+      const fileName = `recording.${audioBlob.type.split('/')[1]?.split(';')[0] || 'webm'}`;
       const file = new File([audioBlob], fileName, { type: audioBlob.type });
 
       setInternalRecordedFile(file);
@@ -159,9 +185,25 @@ export function AudioRecorder({
       };
       reader.readAsDataURL(audioBlob);
 
+      // Stream tracks are stopped here after recording finishes and processing is done.
       audioStreamRef.current?.getTracks().forEach(track => track.stop());
       audioStreamRef.current = null;
     };
+    
+    mediaRecorderRef.current.onerror = (event: Event) => {
+        console.error('MediaRecorder error:', event);
+        let errorMsg = 'An error occurred with the media recorder.';
+        // The event might be a MediaRecorderErrorEvent which has an 'error' property
+        if ('error' in event && event.error instanceof Error) {
+            errorMsg = `MediaRecorder error: ${event.error.name} - ${event.error.message}`;
+        }
+        setMicError(errorMsg);
+        toast({ variant: 'destructive', title: 'Recording Error', description: errorMsg });
+        setIsRecording(false);
+        audioStreamRef.current?.getTracks().forEach(track => track.stop());
+        audioStreamRef.current = null;
+    };
+
 
     mediaRecorderRef.current.start();
     setIsRecording(true);
@@ -170,6 +212,7 @@ export function AudioRecorder({
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
+      // onstop will handle track stopping
       setIsRecording(false);
     }
   };
@@ -191,7 +234,11 @@ export function AudioRecorder({
   };
 
   useEffect(() => {
+    // General cleanup for the component when it unmounts.
     return () => {
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
       mediaRecorderRef.current?.stream?.getTracks().forEach(track => track.stop());
       audioStreamRef.current?.getTracks().forEach(track => track.stop());
     };
@@ -251,8 +298,8 @@ export function AudioRecorder({
               Listen to your recording or proceed with analysis.
             </CardDescription>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-foreground">{internalRecordedFile.name}</span>
-              <span className="text-xs text-muted-foreground">({(internalRecordedFile.size / 1024).toFixed(1)} KB)</span>
+              <span className="text-sm font-medium text-foreground truncate pr-2">{internalRecordedFile.name}</span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">({(internalRecordedFile.size / 1024).toFixed(1)} KB)</span>
             </div>
             <audio ref={audioPlayerRef} className="hidden" />
             <Button 
@@ -268,12 +315,12 @@ export function AudioRecorder({
           </Card>
         )}
 
-        {hasMicPermission === false && !micError && (
+        {hasMicPermission === false && !micError && ( // Only show if no specific error message already exists
           <Alert variant="destructive" className="mt-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Microphone Access Required</AlertTitle>
             <AlertDescription>
-              This app needs access to your microphone. Please enable it in your browser settings and refresh.
+              This app needs access to your microphone. Please enable it in your browser settings and refresh or try again.
             </AlertDescription>
           </Alert>
         )}
@@ -305,3 +352,5 @@ export function AudioRecorder({
     </Card>
   );
 }
+
+    
