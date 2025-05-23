@@ -5,31 +5,32 @@ import type React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Mic, Square, AlertCircle, FileAudio, Loader2, Play } from 'lucide-react';
+import { Mic, Square, AlertCircle, FileAudio, Loader2, Play, Pause } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 interface AudioRecorderProps {
-  onRecordingComplete: (file: File, dataUri: string) => void;
+  onRecordingComplete: (file: File | null, dataUri: string | null) => void;
   onAnalyzeRequest: () => void;
   isLoading: boolean;
   analysisError: string | null;
   parentAudioDataUri: string | null; // To detect reset from parent
 }
 
-export function AudioRecorder({ 
-  onRecordingComplete, 
-  onAnalyzeRequest, 
-  isLoading, 
+export function AudioRecorder({
+  onRecordingComplete,
+  onAnalyzeRequest,
+  isLoading,
   analysisError,
-  parentAudioDataUri 
+  parentAudioDataUri
 }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
-  
+
   const [internalRecordedFile, setInternalRecordedFile] = useState<File | null>(null);
   const [internalRecordedDataUri, setInternalRecordedDataUri] = useState<string | null>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -39,13 +40,34 @@ export function AudioRecorder({
   const { toast } = useToast();
 
   useEffect(() => {
-    // If parent resets audioDataUri, clear internal state too
     if (parentAudioDataUri === null) {
       setInternalRecordedFile(null);
       setInternalRecordedDataUri(null);
-      setMicError(null); // Clear mic errors too on full reset
+      setMicError(null);
+      setIsAudioPlaying(false);
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = '';
+      }
     }
   }, [parentAudioDataUri]);
+
+  useEffect(() => {
+    const audioElement = audioPlayerRef.current;
+    if (audioElement) {
+      const handleAudioPause = () => setIsAudioPlaying(false);
+      const handleAudioEnded = () => setIsAudioPlaying(false);
+
+      audioElement.addEventListener('pause', handleAudioPause);
+      audioElement.addEventListener('ended', handleAudioEnded);
+
+      return () => {
+        audioElement.removeEventListener('pause', handleAudioPause);
+        audioElement.removeEventListener('ended', handleAudioEnded);
+      };
+    }
+  }, [internalRecordedDataUri]);
+
 
   const requestMicPermission = async (): Promise<boolean> => {
     setMicError(null);
@@ -76,36 +98,34 @@ export function AudioRecorder({
     }
 
     if (!permissionGranted || !audioStreamRef.current) {
-      return; // Error handled in requestMicPermission
+      return;
     }
 
     setInternalRecordedFile(null);
     setInternalRecordedDataUri(null);
-    onRecordingComplete(null as any, null as any); // Clear parent state too
+    setIsAudioPlaying(false);
+    onRecordingComplete(null, null);
 
     audioChunksRef.current = [];
-    
-    // Determine supported MIME type
+
     const options = { mimeType: 'audio/webm' };
     if (!MediaRecorder.isTypeSupported(options.mimeType)) {
       console.warn(`${options.mimeType} is not supported, trying audio/ogg`);
       options.mimeType = 'audio/ogg';
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         console.warn(`${options.mimeType} is not supported, trying default`);
-        // @ts-ignore
-        options.mimeType = ''; // Let browser pick
+        (options as any).mimeType = '';
       }
     }
 
     try {
       mediaRecorderRef.current = new MediaRecorder(audioStreamRef.current, options);
     } catch (e) {
-       console.error("Error creating MediaRecorder:", e);
-       setMicError("Failed to create audio recorder. Your browser might not support the available audio formats.");
-       toast({ variant: 'destructive', title: 'Recording Error', description: "Could not initialize audio recorder."});
-       return;
+      console.error("Error creating MediaRecorder:", e);
+      setMicError("Failed to create audio recorder. Your browser might not support the available audio formats.");
+      toast({ variant: 'destructive', title: 'Recording Error', description: "Could not initialize audio recorder." });
+      return;
     }
-
 
     mediaRecorderRef.current.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -117,7 +137,7 @@ export function AudioRecorder({
       const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || 'audio/webm' });
       const fileName = `recording.${audioBlob.type.split('/')[1] || 'webm'}`;
       const file = new File([audioBlob], fileName, { type: audioBlob.type });
-      
+
       setInternalRecordedFile(file);
 
       const reader = new FileReader();
@@ -125,6 +145,9 @@ export function AudioRecorder({
         const dataUri = reader.result as string;
         setInternalRecordedDataUri(dataUri);
         onRecordingComplete(file, dataUri);
+        if (audioPlayerRef.current) {
+          audioPlayerRef.current.src = dataUri;
+        }
       };
       reader.onerror = (error) => {
         console.error("Error converting blob to data URI:", error);
@@ -133,9 +156,8 @@ export function AudioRecorder({
       };
       reader.readAsDataURL(audioBlob);
 
-      // Stop media stream tracks to turn off microphone indicator
       audioStreamRef.current?.getTracks().forEach(track => track.stop());
-      audioStreamRef.current = null; // Release the stream
+      audioStreamRef.current = null;
     };
 
     mediaRecorderRef.current.start();
@@ -146,19 +168,30 @@ export function AudioRecorder({
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      // Stream tracks are stopped in onstop handler
     }
   };
-  
-  const handlePlayRecording = () => {
+
+  const handleTogglePlayPauseRecording = () => {
     if (audioPlayerRef.current && internalRecordedDataUri) {
-        audioPlayerRef.current.src = internalRecordedDataUri;
-        audioPlayerRef.current.play().catch(e => console.error("Error playing audio:", e));
+      if (isAudioPlaying) {
+        audioPlayerRef.current.pause();
+        setIsAudioPlaying(false);
+      } else {
+        // Ensure src is set before playing, especially if reset happened
+        if (audioPlayerRef.current.src !== internalRecordedDataUri) {
+            audioPlayerRef.current.src = internalRecordedDataUri;
+        }
+        audioPlayerRef.current.play().then(() => {
+            setIsAudioPlaying(true);
+        }).catch(e => {
+            console.error("Error playing audio:", e);
+            setIsAudioPlaying(false); // Reset state if play fails
+            toast({variant: 'destructive', title: 'Playback Error', description: 'Could not play the audio.'})
+        });
+      }
     }
   };
 
-
-  // Cleanup stream on unmount
   useEffect(() => {
     return () => {
       mediaRecorderRef.current?.stream?.getTracks().forEach(track => track.stop());
@@ -224,21 +257,22 @@ export function AudioRecorder({
               <span className="text-xs text-muted-foreground">({(internalRecordedFile.size / 1024).toFixed(1)} KB)</span>
             </div>
             <audio ref={audioPlayerRef} className="hidden" />
-            <Button onClick={handlePlayRecording} variant="outline" size="sm" className="w-full mb-3">
-                <Play className="mr-2 h-4 w-4" /> Play Recording
+            <Button onClick={handleTogglePlayPauseRecording} variant="outline" size="sm" className="w-full mb-3">
+              {isAudioPlaying ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+              {isAudioPlaying ? 'Pause Recording' : 'Play Recording'}
             </Button>
           </Card>
         )}
-        
+
         {hasMicPermission === false && !micError && (
-             <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Microphone Access Required</AlertTitle>
-              <AlertDescription>
-                This app needs access to your microphone to record audio. 
-                Please enable microphone permissions in your browser settings and refresh the page.
-              </AlertDescription>
-            </Alert>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Microphone Access Required</AlertTitle>
+            <AlertDescription>
+              This app needs access to your microphone to record audio.
+              Please enable microphone permissions in your browser settings and refresh the page.
+            </AlertDescription>
+          </Alert>
         )}
 
         {displayError && (
@@ -250,7 +284,7 @@ export function AudioRecorder({
 
         <Button
           onClick={onAnalyzeRequest}
-          disabled={!internalRecordedDataUri || isLoading || !!micError || isRecording}
+          disabled={!internalRecordedDataUri || isLoading || !!micError || isRecording || isAudioPlaying}
           className="w-full text-lg py-6"
           size="lg"
         >
