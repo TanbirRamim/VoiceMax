@@ -24,21 +24,21 @@ export function FeedbackDisplay({ feedbackText, suggestion, primaryEmotion }: Fe
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert variant={isPositiveFeedback ? "default" : "default"} className={`${isPositiveFeedback ? 'bg-green-500/10 border-green-500/50 text-foreground' : 'bg-blue-500/10 border-blue-500/50 text-foreground'}`}>
-          <Sparkles className={`h-5 w-5 ${isPositiveFeedback ? 'text-green-600' : 'text-blue-600'}`} />
-          <AlertTitle className={`font-semibold ${isPositiveFeedback ? 'text-green-700' : 'text-blue-700'}`}>From Your Voice Analyst</AlertTitle>
-          <AlertDescription className="text-base">
+        <Alert variant="default" className="bg-teal-600/15 border-teal-500/30 hover:bg-teal-600/20 transition-colors">
+          <Sparkles className="h-5 w-5 text-teal-300" />
+          <AlertTitle className="font-semibold text-teal-200">From Your Voice Analyst</AlertTitle>
+          <AlertDescription className="text-base text-teal-100 font-medium leading-relaxed tracking-wide">
             {feedbackText}
           </AlertDescription>
         </Alert>
 
         {suggestion && (
-          <Alert variant="default" className="bg-accent/10 border-accent/50 text-foreground">
+          <Alert variant="default" className="bg-amber-600/15 border-amber-500/30 hover:bg-amber-600/20 transition-colors">
              {(primaryEmotion && ['sad', 'angry', 'anxious', 'fear', 'stressed'].includes(primaryEmotion.toLowerCase())) ? 
-                <Leaf className="h-5 w-5 text-accent" /> : 
-                <Zap className="h-5 w-5 text-accent" />}
-            <AlertTitle className="font-semibold text-accent-foreground">A Little Tip For You</AlertTitle>
-            <AlertDescription className="text-base">
+                <Leaf className="h-5 w-5 text-amber-300" /> : 
+                <Zap className="h-5 w-5 text-amber-300" />}
+            <AlertTitle className="font-semibold text-amber-200">A Little Tip For You</AlertTitle>
+            <AlertDescription className="text-base text-amber-100 font-medium leading-relaxed tracking-wide">
               {suggestion}
             </AlertDescription>
           </Alert>

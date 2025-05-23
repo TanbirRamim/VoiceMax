@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,19 +22,19 @@ export function DetailedObservations({ stressLevel, speechCharacteristics }: Det
       </CardHeader>
       <CardContent className="space-y-4">
         {stressLevel && (
-          <Alert variant="default" className="bg-purple-500/10 border-purple-500/50">
-            <Thermometer className="h-5 w-5 text-purple-600" />
-            <AlertTitle className="font-semibold text-purple-700">Perceived Stress Level</AlertTitle>
-            <AlertDescription className="text-base text-foreground">
+          <Alert variant="default" className="bg-lime-500/20 border-lime-400/40">
+            <Thermometer className="h-5 w-5 text-lime-400" />
+            <AlertTitle className="font-semibold text-lime-300">Perceived Stress Level</AlertTitle>
+            <AlertDescription className="text-base text-lime-200 font-medium leading-relaxed tracking-wide">
               {stressLevel}
             </AlertDescription>
           </Alert>
         )}
         {speechCharacteristics && (
-          <Alert variant="default" className="bg-indigo-500/10 border-indigo-500/50">
-            <Sliders className="h-5 w-5 text-indigo-600" />
-            <AlertTitle className="font-semibold text-indigo-700">Speech Characteristics</AlertTitle>
-            <AlertDescription className="text-base text-foreground">
+          <Alert variant="default" className="bg-violet-500/20 border-violet-400/40">
+            <Sliders className="h-5 w-5 text-violet-400" />
+            <AlertTitle className="font-semibold text-violet-300">Speech Characteristics</AlertTitle>
+            <AlertDescription className="text-base text-violet-200 font-medium leading-relaxed tracking-wide">
               {speechCharacteristics}
             </AlertDescription>
           </Alert>
