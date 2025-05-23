@@ -26,7 +26,7 @@ export type ProvidePersonalizedFeedbackOutput = z.infer<typeof ProvidePersonaliz
 
 const breathingExerciseTool = ai.defineTool({
   name: 'breathingExerciseSuggestion',
-  description: 'Suggests a specific breathing or mindfulness exercise to help manage negative emotions based on the type of emotion.',
+  description: 'Suggests a specific breathing or mindfulness exercise to help manage negative emotions based on the type of emotion. This tool returns the text of the exercise.',
   inputSchema: z.object({
     emotion: z.string().describe('The negative emotion experienced by the user (e.g., anxious, sad, angry).'),
   }),
@@ -62,15 +62,17 @@ const prompt = ai.definePrompt({
 
   The detected emotion is: {{{emotion}}}
 
-  If the emotion is positive (e.g., happy, excited, content), provide a short, encouraging, and positive reinforcement message. In this case, the suggestion field can be a general well-being tip or left brief.
-  If the emotion is negative (e.g., sad, angry, anxious, stressed), provide an understanding and motivational message. Crucially, for negative emotions, use the 'breathingExerciseSuggestion' tool to get a specific, tailored breathing or mindfulness exercise and include that exercise in the "suggestion" field of your response.
-  
+  If the emotion is positive (e.g., happy, excited, content), provide a short, encouraging, and positive reinforcement message. In this case, the "suggestion" field in the output JSON can be a general well-being tip or left empty.
+  If the emotion is negative (e.g., sad, angry, anxious, stressed), provide an understanding and motivational message.
+  Crucially, for negative emotions, you MUST use the 'breathingExerciseSuggestion' tool to obtain a specific, tailored breathing or mindfulness exercise.
+  After the tool returns the exercise text, you MUST place that exact exercise text directly into the "suggestion" field of your JSON output.
+
   Always keep your feedback concise, supportive, and easy to understand.
 
   Output the result in the following JSON format:
   {
     "feedback": "Your feedback message here.",
-    "suggestion": "The specific exercise from the tool if emotion is negative, or a general tip/empty for positive emotions."
+    "suggestion": "If the emotion was negative, this field MUST contain the actual exercise text returned by the breathingExerciseSuggestion tool. For example: 'Try Box Breathing: Inhale for 4 seconds, hold for 4, exhale for 4, hold for 4. Repeat.' If the emotion was positive, this can be a general well-being tip or an empty string."
   }`,
 });
 
