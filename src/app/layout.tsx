@@ -14,11 +14,10 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-// If src/app/icon.png exists, Next.js will automatically use it.
-// No explicit 'icons' metadata is needed for this default behavior.
 export const metadata: Metadata = {
   title: 'VoiceMax - Voice that states your mental health',
   description: 'Analyze emotions in your voice with VoiceMax.',
+  icons: [], // Explicitly tell Next.js metadata to not handle/look for default icons
 };
 
 export default function RootLayout({
@@ -29,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Favicon will be automatically handled by Next.js if src/app/icon.png exists */}
+        <link rel="icon" href="/favicon.png" type="image/png" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
