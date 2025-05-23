@@ -1,166 +1,267 @@
+
 'use client';
 
 import type React from 'react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { UploadCloud, FileAudio, AlertCircle } from 'lucide-react';
+import { Mic, Square, AlertCircle, FileAudio, Loader2, Play } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
-interface AudioUploaderProps {
-  onFileChange: (file: File | null, dataUri: string | null) => void;
-  onAnalyze: () => void;
+interface AudioRecorderProps {
+  onRecordingComplete: (file: File, dataUri: string) => void;
+  onAnalyzeRequest: () => void;
   isLoading: boolean;
-  currentError?: string | null;
+  analysisError: string | null;
+  parentAudioDataUri: string | null; // To detect reset from parent
 }
 
-export function AudioUploader({ onFileChange, onAnalyze, isLoading, currentError }: AudioUploaderProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export function AudioRecorder({ 
+  onRecordingComplete, 
+  onAnalyzeRequest, 
+  isLoading, 
+  analysisError,
+  parentAudioDataUri 
+}: AudioRecorderProps) {
+  const [isRecording, setIsRecording] = useState(false);
+  const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
+  const [micError, setMicError] = useState<string | null>(null);
+  
+  const [internalRecordedFile, setInternalRecordedFile] = useState<File | null>(null);
+  const [internalRecordedDataUri, setInternalRecordedDataUri] = useState<string | null>(null);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    await processFile(file);
-  };
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
-  const processFile = async (file: File | undefined | null) => {
-    setLocalError(null); 
-    if (file) {
-      if (!file.type.startsWith('audio/')) {
-        setLocalError('Invalid file type. Please upload an audio file.');
-        setSelectedFile(null);
-        onFileChange(null, null);
-        return;
-      }
-      setSelectedFile(file);
-      try {
-        const dataUri = await fileToDataUri(file);
-        onFileChange(file, dataUri);
-      } catch (error) {
-        console.error("Error converting file to data URI:", error);
-        setLocalError('Error processing file. Please try again.');
-        onFileChange(null, null);
-      }
-    } else {
-      setSelectedFile(null);
-      onFileChange(null, null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // If parent resets audioDataUri, clear internal state too
+    if (parentAudioDataUri === null) {
+      setInternalRecordedFile(null);
+      setInternalRecordedDataUri(null);
+      setMicError(null); // Clear mic errors too on full reset
     }
-  }
+  }, [parentAudioDataUri]);
 
-  const fileToDataUri = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
+  const requestMicPermission = async (): Promise<boolean> => {
+    setMicError(null);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setMicError('Media devices API not available in this browser.');
+      toast({ variant: 'destructive', title: 'Error', description: 'Audio recording is not supported by your browser.' });
+      setHasMicPermission(false);
+      return false;
+    }
+    try {
+      audioStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setHasMicPermission(true);
+      return true;
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      const errorMsg = 'Microphone access denied. Please enable it in your browser settings.';
+      setMicError(errorMsg);
+      toast({ variant: 'destructive', title: 'Microphone Access Denied', description: 'Please enable microphone permissions in your browser settings.' });
+      setHasMicPermission(false);
+      return false;
+    }
+  };
+
+  const handleStartRecording = async () => {
+    let permissionGranted = hasMicPermission;
+    if (permissionGranted === null || permissionGranted === false) {
+      permissionGranted = await requestMicPermission();
+    }
+
+    if (!permissionGranted || !audioStreamRef.current) {
+      return; // Error handled in requestMicPermission
+    }
+
+    setInternalRecordedFile(null);
+    setInternalRecordedDataUri(null);
+    onRecordingComplete(null as any, null as any); // Clear parent state too
+
+    audioChunksRef.current = [];
+    
+    // Determine supported MIME type
+    const options = { mimeType: 'audio/webm' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      console.warn(`${options.mimeType} is not supported, trying audio/ogg`);
+      options.mimeType = 'audio/ogg';
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        console.warn(`${options.mimeType} is not supported, trying default`);
+        // @ts-ignore
+        options.mimeType = ''; // Let browser pick
+      }
+    }
+
+    try {
+      mediaRecorderRef.current = new MediaRecorder(audioStreamRef.current, options);
+    } catch (e) {
+       console.error("Error creating MediaRecorder:", e);
+       setMicError("Failed to create audio recorder. Your browser might not support the available audio formats.");
+       toast({ variant: 'destructive', title: 'Recording Error', description: "Could not initialize audio recorder."});
+       return;
+    }
+
+
+    mediaRecorderRef.current.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorderRef.current.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || 'audio/webm' });
+      const fileName = `recording.${audioBlob.type.split('/')[1] || 'webm'}`;
+      const file = new File([audioBlob], fileName, { type: audioBlob.type });
+      
+      setInternalRecordedFile(file);
+
       const reader = new FileReader();
-      reader.onload = () => {
-        resolve(reader.result as string);
+      reader.onloadend = () => {
+        const dataUri = reader.result as string;
+        setInternalRecordedDataUri(dataUri);
+        onRecordingComplete(file, dataUri);
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+      reader.onerror = (error) => {
+        console.error("Error converting blob to data URI:", error);
+        setMicError("Failed to process recorded audio.");
+        toast({ variant: 'destructive', title: 'Processing Error', description: 'Could not process the recorded audio.' });
+      };
+      reader.readAsDataURL(audioBlob);
+
+      // Stop media stream tracks to turn off microphone indicator
+      audioStreamRef.current?.getTracks().forEach(track => track.stop());
+      audioStreamRef.current = null; // Release the stream
+    };
+
+    mediaRecorderRef.current.start();
+    setIsRecording(true);
   };
 
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      // Stream tracks are stopped in onstop handler
+    }
   };
   
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDragging) setIsDragging(true); // Ensure isDragging is true
-  };
-
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    await processFile(file);
-    if (fileInputRef.current) { // Sync with hidden input for consistency if needed
-      const dataTransfer = new DataTransfer();
-      if (file) dataTransfer.items.add(file);
-      fileInputRef.current.files = dataTransfer.files;
+  const handlePlayRecording = () => {
+    if (audioPlayerRef.current && internalRecordedDataUri) {
+        audioPlayerRef.current.src = internalRecordedDataUri;
+        audioPlayerRef.current.play().catch(e => console.error("Error playing audio:", e));
     }
   };
 
-  const openFileDialog = () => {
-    fileInputRef.current?.click();
-  }
+
+  // Cleanup stream on unmount
+  useEffect(() => {
+    return () => {
+      mediaRecorderRef.current?.stream?.getTracks().forEach(track => track.stop());
+      audioStreamRef.current?.getTracks().forEach(track => track.stop());
+    };
+  }, []);
+
+  const displayError = micError || analysisError;
 
   return (
     <Card className="w-full shadow-lg">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-2xl">
-          <UploadCloud className="h-7 w-7 text-primary" />
-          Upload Your Voice
+          <Mic className="h-7 w-7 text-primary" />
+          Record Your Voice
         </CardTitle>
         <CardDescription>
-          Select an audio file to analyze the emotions within.
+          Click "Start Recording" and speak into your microphone.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div
-          className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors
-            ${isDragging ? 'border-primary bg-primary/10' : 'border-border hover:border-accent'}
-            ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onClick={isLoading ? undefined : openFileDialog}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openFileDialog();}}
-        >
-          <Input
-            type="file"
-            accept="audio/*"
-            onChange={handleFileChange}
-            className="hidden"
-            ref={fileInputRef}
-            disabled={isLoading}
-          />
-          <UploadCloud className={`h-12 w-12 mb-3 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
-          <p className={`text-lg ${isDragging ? 'text-primary' : 'text-muted-foreground'}`}>
-            {isDragging ? 'Drop your audio file here' : 'Drag & drop or click to upload'}
-          </p>
-          <p className="text-xs text-muted-foreground/80 mt-1">
-            Supported formats: MP3, WAV, M4A, etc.
-          </p>
+        <div className="flex flex-col items-center space-y-4">
+          {!isRecording ? (
+            <Button
+              onClick={handleStartRecording}
+              disabled={isLoading}
+              className="w-full py-3 text-base"
+              size="lg"
+            >
+              <Mic className="mr-2 h-5 w-5" />
+              Start Recording
+            </Button>
+          ) : (
+            <Button
+              onClick={handleStopRecording}
+              variant="destructive"
+              className="w-full py-3 text-base"
+              size="lg"
+            >
+              <Square className="mr-2 h-5 w-5" />
+              Stop Recording
+            </Button>
+          )}
+          {isRecording && (
+            <div className="flex items-center text-destructive animate-pulse">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Recording...
+            </div>
+          )}
         </div>
 
-        {selectedFile && !localError && (
-          <div className="p-3 bg-secondary/30 rounded-md text-sm text-secondary-foreground flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileAudio className="h-5 w-5 text-accent" />
-              <span>{selectedFile.name}</span>
+        {internalRecordedFile && internalRecordedDataUri && !isRecording && (
+          <Card className="p-4 bg-secondary/20 border border-secondary">
+            <CardTitle className="text-lg mb-2 flex items-center">
+              <FileAudio className="h-5 w-5 mr-2 text-accent" />
+              Recording Saved
+            </CardTitle>
+            <CardDescription className="text-sm mb-3">
+              Your voice has been recorded. You can play it back or proceed to analysis.
+            </CardDescription>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium">{internalRecordedFile.name}</span>
+              <span className="text-xs text-muted-foreground">({(internalRecordedFile.size / 1024).toFixed(1)} KB)</span>
             </div>
-            <span className="text-xs">({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</span>
-          </div>
+            <audio ref={audioPlayerRef} className="hidden" />
+            <Button onClick={handlePlayRecording} variant="outline" size="sm" className="w-full mb-3">
+                <Play className="mr-2 h-4 w-4" /> Play Recording
+            </Button>
+          </Card>
         )}
         
-        {(localError || currentError) && (
+        {hasMicPermission === false && !micError && (
+             <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Microphone Access Required</AlertTitle>
+              <AlertDescription>
+                This app needs access to your microphone to record audio. 
+                Please enable microphone permissions in your browser settings and refresh the page.
+              </AlertDescription>
+            </Alert>
+        )}
+
+        {displayError && (
           <div className="p-3 bg-destructive/20 border border-destructive text-destructive rounded-md text-sm flex items-center gap-2">
             <AlertCircle className="h-5 w-5" />
-            <span>{localError || currentError}</span>
+            <span>{displayError}</span>
           </div>
         )}
 
         <Button
-          onClick={onAnalyze}
-          disabled={!selectedFile || isLoading || !!localError || !!currentError}
+          onClick={onAnalyzeRequest}
+          disabled={!internalRecordedDataUri || isLoading || !!micError || isRecording}
           className="w-full text-lg py-6"
           size="lg"
         >
-          {isLoading ? 'Analyzing...' : 'Analyze Voice'}
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Analyzing...
+            </>
+          ) : (
+            'Analyze Voice'
+          )}
         </Button>
       </CardContent>
     </Card>

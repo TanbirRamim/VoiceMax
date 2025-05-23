@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCcw } from 'lucide-react';
-import { AudioUploader } from '@/components/voice-max/audio-uploader';
+import { AudioRecorder } from '@/components/voice-max/audio-uploader'; // Renamed for clarity
 import { EmotionDisplay } from '@/components/voice-max/emotion-display';
 import { EmotionSuggestions } from '@/components/voice-max/emotion-suggestions';
 import { FeedbackDisplay } from '@/components/voice-max/feedback-display';
@@ -20,32 +21,32 @@ interface AnalysisResult {
 }
 
 export default function VoiceMaxPage() {
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [audioDataUri, setAudioDataUri] = useState<string | null>(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null); // Will hold the recorded audio File object
+  const [audioDataUri, setAudioDataUri] = useState<string | null>(null); // Will hold the recorded audio data URI
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
   useEffect(() => {
     setClientLoaded(true);
   }, []);
 
-  const handleFileChange = (file: File | null, dataUri: string | null) => {
+  const handleRecordingComplete = (file: File, dataUri: string) => {
     setAudioFile(file);
     setAudioDataUri(dataUri);
     setAnalysisResult(null); // Reset previous results
-    setError(null); // Reset previous errors
+    setAnalysisError(null); // Reset previous errors
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyzeRequest = async () => {
     if (!audioDataUri || !audioFile) {
-      setError('Please select an audio file first.');
+      setAnalysisError('No recording available to analyze.');
       return;
     }
 
     setIsLoading(true);
-    setError(null);
+    setAnalysisError(null);
     setAnalysisResult(null);
 
     try {
@@ -58,11 +59,12 @@ export default function VoiceMaxPage() {
         throw new Error('Could not detect primary emotion.');
       }
       
+      // Set intermediate result for primary emotion first
       setAnalysisResult(prev => ({
-        ...prev,
         primaryEmotion,
-        suggestedEmotions: [], // Initialize
-        feedbackText: '', // Initialize
+        suggestedEmotions: [], 
+        feedbackText: '',
+        ...(prev || {}) // Spread previous if it existed, though it's reset above
       }));
 
       // 2. Suggest additional emotions
@@ -89,7 +91,7 @@ export default function VoiceMaxPage() {
 
     } catch (err: any) {
       console.error('Analysis failed:', err);
-      setError(err.message || 'An unknown error occurred during analysis.');
+      setAnalysisError(err.message || 'An unknown error occurred during analysis.');
       setAnalysisResult(null);
     } finally {
       setIsLoading(false);
@@ -98,11 +100,10 @@ export default function VoiceMaxPage() {
 
   const resetState = () => {
     setAudioFile(null);
-    setAudioDataUri(null);
+    setAudioDataUri(null); // This will trigger reset in AudioRecorder via prop
     setAnalysisResult(null);
-    setError(null);
+    setAnalysisError(null);
     setIsLoading(false);
-    // Optionally, clear the file input visually if a ref is available
   };
 
   if (!clientLoaded) {
@@ -119,18 +120,19 @@ export default function VoiceMaxPage() {
         <header className="text-center">
           <h1 className="text-5xl font-bold text-primary mb-2 tracking-tight">VoiceMax</h1>
           <p className="text-xl text-muted-foreground">
-            Unlock the emotions hidden in your voice.
+            Record your voice to unlock hidden emotions.
           </p>
         </header>
 
-        <AudioUploader
-          onFileChange={handleFileChange}
-          onAnalyze={handleAnalyze}
+        <AudioRecorder
+          onRecordingComplete={handleRecordingComplete}
+          onAnalyzeRequest={handleAnalyzeRequest}
           isLoading={isLoading}
-          currentError={error}
+          analysisError={analysisError}
+          parentAudioDataUri={audioDataUri} // Used to trigger reset in child
         />
 
-        {isLoading && (
+        {isLoading && !analysisResult && ( // Show loading only if no partial results yet
           <Card className="w-full shadow-lg">
             <CardContent className="flex flex-col items-center justify-center p-10 space-y-3">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -142,22 +144,22 @@ export default function VoiceMaxPage() {
         {!isLoading && analysisResult && (
           <div className="space-y-6 animate-fadeIn">
             <EmotionDisplay emotion={analysisResult.primaryEmotion} />
-            <EmotionSuggestions suggestions={analysisResult.suggestedEmotions} />
-            <FeedbackDisplay
-              feedbackText={analysisResult.feedbackText}
-              suggestion={analysisResult.feedbackSuggestion}
-              primaryEmotion={analysisResult.primaryEmotion}
-            />
+            {analysisResult.suggestedEmotions && analysisResult.suggestedEmotions.length > 0 && (
+              <EmotionSuggestions suggestions={analysisResult.suggestedEmotions} />
+            )}
+            {analysisResult.feedbackText && (
+              <FeedbackDisplay
+                feedbackText={analysisResult.feedbackText}
+                suggestion={analysisResult.feedbackSuggestion}
+                primaryEmotion={analysisResult.primaryEmotion}
+              />
+            )}
              <Button onClick={resetState} variant="outline" className="w-full">
-              <RefreshCcw className="mr-2 h-4 w-4" /> Analyze Another File
+              <RefreshCcw className="mr-2 h-4 w-4" /> Record New Audio
             </Button>
           </div>
         )}
         
-        {/* Error display is handled within AudioUploader for file-related errors, 
-            and analysis errors will clear results and show in AudioUploader too. 
-            If a more general error display is needed, it can be added here. */}
-
       </main>
       <footer className="text-center mt-12 text-sm text-muted-foreground/70">
         <p>&copy; {new Date().getFullYear()} VoiceMax. Powered by Genkit AI.</p>
