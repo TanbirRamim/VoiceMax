@@ -1,5 +1,5 @@
 
-import type { Metadata } from 'next';
+import type { Metadata, IconDescriptor } from 'next'; // Added IconDescriptor
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
@@ -14,12 +14,23 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const faviconDescriptors: IconDescriptor[] = [
+  {
+    url: '/favicon.png', // Next.js serves src/app/favicon.png at /favicon.png
+    type: 'image/png',
+    sizes: 'any', // Or you can specify exact sizes like '32x32'
+  },
+];
+
 export const metadata: Metadata = {
   title: 'VoiceMax - Voice that states your mental health',
   description: 'Analyze emotions in your voice with VoiceMax.',
-  // Explicitly opt-out of Next.js automatic icon handling
-  // to prevent it from looking for favicon.ico or other defaults.
-  icons: null,
+  icons: {
+    icon: faviconDescriptors, // Using the more explicit IconDescriptor array
+    // You can also add other icon types here if needed:
+    // apple: '/apple-icon.png',
+    // shortcut: '/shortcut-icon.png',
+  },
 };
 
 export default function RootLayout({
@@ -30,8 +41,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Manually add the link tag for the favicon */}
-        <link rel="icon" href="/favicon.png" type="image/png" sizes="any" />
+        {/* Metadata API will handle link tag generation */}
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
