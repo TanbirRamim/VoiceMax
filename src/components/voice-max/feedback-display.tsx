@@ -15,9 +15,23 @@ interface FeedbackDisplayProps {
 export function FeedbackDisplay({ feedbackText, suggestion, primaryEmotion }: FeedbackDisplayProps) {
   if (!feedbackText) return null;
 
-  const isNegativeEmotionForExercise = primaryEmotion && ['sad', 'angry', 'anxious', 'fear', 'stressed', 'sorrow', 'irate', 'frustrated', 'worried', 'nervous', 'disappointed', 'gloomy', 'grief'].some(e => primaryEmotion.toLowerCase().includes(e));
+  // List of distinctly positive emotions
+  const positiveEmotions = [
+    'happy', 'joy', 'elated', 'excited', 'content', 
+    'pleased', 'grateful', 'hopeful', 'love', 'amusement'
+  ];
 
-  const showSeekSupportSection = isNegativeEmotionForExercise;
+  // Determine if the emotion is NOT positive (i.e., it's negative or neutral)
+  const showSeekSupportSection = primaryEmotion && !positiveEmotions.includes(primaryEmotion.toLowerCase());
+
+  // Determine if the suggestion is specifically a coping/breathing exercise (typically for negative emotions)
+  const isCopingExerciseSuggestion = suggestion && (
+    suggestion.toLowerCase().includes('breathing') ||
+    suggestion.toLowerCase().includes('inhale') ||
+    suggestion.toLowerCase().includes('exhale') ||
+    suggestion.toLowerCase().includes('mindful') ||
+    suggestion.toLowerCase().includes('calming')
+  );
 
   return (
     <Card className="shadow-lg border-border/50 bg-card overflow-hidden">
@@ -38,7 +52,7 @@ export function FeedbackDisplay({ feedbackText, suggestion, primaryEmotion }: Fe
 
         {suggestion && (
           <Alert variant="default" className="bg-accent/10 border-accent/50 text-foreground shadow-sm">
-             {isNegativeEmotionForExercise ?
+             {isCopingExerciseSuggestion ?
                 <Leaf className="h-5 w-5 text-accent" /> :
                 <Zap className="h-5 w-5 text-accent" />}
             <AlertTitle className="font-semibold text-accent text-lg">A Little Tip For You</AlertTitle>
