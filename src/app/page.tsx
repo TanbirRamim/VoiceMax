@@ -13,6 +13,7 @@ import { analyzeAudioEmotion, AnalyzeAudioEmotionInput, AnalyzeAudioEmotionOutpu
 import { suggestAdditionalEmotions, SuggestAdditionalEmotionsInput, SuggestAdditionalEmotionsOutput } from '@/ai/flows/suggest-additional-emotions';
 import { providePersonalizedFeedback, ProvidePersonalizedFeedbackInput, ProvidePersonalizedFeedbackOutput } from '@/ai/flows/provide-personalized-feedback';
 import { Card, CardContent } from '@/components/ui/card';
+import { OpeningBuffer } from '@/components/voice-max/opening-buffer';
 
 interface AnalysisResult {
   primaryEmotion: string;
@@ -99,7 +100,7 @@ export default function VoiceMaxPage() {
        if (err.message && (err.message.includes('429 Too Many Requests') || err.message.includes('QuotaFailure') || err.message.includes('rate limit'))) {
         userFriendlyError = 'Analysis failed due to API rate limits. You may have exceeded the free tier usage. Please try again in a few moments or check your Google Cloud project plan and billing details.';
       } else if (err.message) {
-        const match = err.message.match(/\[\d{3} .*?\] (.*)/);
+        const match = err.message.match(/\\[\\d{3} .*?\\] (.*)/);
         userFriendlyError = match && match[1] ? match[1].split('.')[0] : err.message;
       }
       setAnalysisError(userFriendlyError);
@@ -117,79 +118,84 @@ export default function VoiceMaxPage() {
     setIsLoading(false);
   };
 
-  if (!clientLoaded) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 bg-background text-foreground">
-      <main className="w-full max-w-2xl space-y-8 flex-grow">
-        <header className="text-center space-y-2 pt-8 sm:pt-12">
-          <h1 className="text-5xl sm:text-6xl font-bold text-primary tracking-tight">VoiceMax</h1>
-          <p className="text-lg sm:text-xl text-muted-foreground">
-            Uncover the emotions in your voice. Gain insights, get feedback.
-          </p>
-        </header>
-
-        <AudioRecorder
-          onRecordingComplete={handleRecordingComplete}
-          onAnalyzeRequest={handleAnalyzeRequest}
-          isLoading={isLoading}
-          analysisError={analysisError}
-          parentAudioDataUri={audioDataUri} 
-        />
-
-        {isLoading && !analysisResult && ( 
-          <Card className="w-full shadow-xl border-primary/30">
-            <CardContent className="flex flex-col items-center justify-center p-10 space-y-4">
-              <Loader2 className="h-14 w-14 animate-spin text-primary" />
-              <p className="text-lg text-muted-foreground">Analyzing your voice...</p>
-              <p className="text-sm text-muted-foreground/80">This may take a moment.</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {!isLoading && analysisResult && (
-          <div className="space-y-6 animate-fadeIn pb-8">
-            <EmotionDisplay emotion={analysisResult.primaryEmotion} />
-            <DetailedObservations
-              stressLevel={analysisResult.perceivedStressLevel}
-              speechCharacteristics={analysisResult.speechCharacteristics}
-            />
-            {analysisResult.suggestedEmotions && analysisResult.suggestedEmotions.length > 0 && (
-              <EmotionSuggestions suggestions={analysisResult.suggestedEmotions} />
-            )}
-            {analysisResult.feedbackText && (
-              <FeedbackDisplay
-                feedbackText={analysisResult.feedbackText}
-                suggestion={analysisResult.feedbackSuggestion}
-                primaryEmotion={analysisResult.primaryEmotion}
-              />
-            )}
-             <Button onClick={resetState} variant="outline" className="w-full py-3 text-base hover:bg-primary/10 hover:border-primary">
-              <RefreshCcw className="mr-2 h-4 w-4" /> Record New Audio
-            </Button>
+    <>
+      <OpeningBuffer />
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 bg-background text-foreground">
+        
+        {!clientLoaded && (
+          <div className="fixed inset-0 flex items-center justify-center bg-background z-40">
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
           </div>
         )}
+
+        {clientLoaded && (
+          <>
+            <main className="w-full max-w-2xl space-y-8 flex-grow">
+              <header className="text-center space-y-2 pt-8 sm:pt-12">
+                <h1 className="text-5xl sm:text-6xl font-bold text-primary tracking-tight">VoiceMax</h1>
+                <p className="text-lg sm:text-xl text-muted-foreground">
+                  Uncover the emotions in your voice. Gain insights, get feedback.
+                </p>
+              </header>
+
+              <AudioRecorder
+                onRecordingComplete={handleRecordingComplete}
+                onAnalyzeRequest={handleAnalyzeRequest}
+                isLoading={isLoading}
+                analysisError={analysisError}
+                parentAudioDataUri={audioDataUri} 
+              />
+
+              {isLoading && !analysisResult && ( 
+                <Card className="w-full shadow-xl border-primary/30">
+                  <CardContent className="flex flex-col items-center justify-center p-10 space-y-4">
+                    <Loader2 className="h-14 w-14 animate-spin text-primary" />
+                    <p className="text-lg text-muted-foreground">Analyzing your voice...</p>
+                    <p className="text-sm text-muted-foreground/80">This may take a moment.</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isLoading && analysisResult && (
+                <div className="space-y-6 animate-fadeIn pb-8">
+                  <EmotionDisplay emotion={analysisResult.primaryEmotion} />
+                  <DetailedObservations
+                    stressLevel={analysisResult.perceivedStressLevel}
+                    speechCharacteristics={analysisResult.speechCharacteristics}
+                  />
+                  {analysisResult.suggestedEmotions && analysisResult.suggestedEmotions.length > 0 && (
+                    <EmotionSuggestions suggestions={analysisResult.suggestedEmotions} />
+                  )}
+                  {analysisResult.feedbackText && (
+                    <FeedbackDisplay
+                      feedbackText={analysisResult.feedbackText}
+                      suggestion={analysisResult.feedbackSuggestion}
+                      primaryEmotion={analysisResult.primaryEmotion}
+                    />
+                  )}
+                  <Button onClick={resetState} variant="outline" className="w-full py-3 text-base hover:bg-primary/10 hover:border-primary">
+                    <RefreshCcw className="mr-2 h-4 w-4" /> Record New Audio
+                  </Button>
+                </div>
+              )}
+            </main>
+            <footer className="w-full max-w-2xl text-center py-6 text-sm text-muted-foreground">
+              <p>An Initiative from Hackaburg 2025 | Team 2.1</p>
+            </footer>
+          </>
+        )}
         
-      </main>
-      <footer className="w-full max-w-2xl text-center py-6 text-sm text-muted-foreground">
-        <p>An Initiative from Hackaburg 2025 | Team 2.1</p>
-      </footer>
-      
-      <style jsx global>{`
-        .animate-fadeIn {
-          animation: fadeIn 0.7s ease-in-out;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(15px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </div>
+        <style jsx global>{`
+          .animate-fadeIn {
+            animation: fadeIn 0.7s ease-in-out;
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+      </div>
+    </>
   );
 }
