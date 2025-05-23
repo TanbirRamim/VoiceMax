@@ -127,8 +127,8 @@ export default function VoiceMaxPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 bg-background text-foreground">
-      <main className="w-full max-w-2xl space-y-10">
-        <header className="text-center space-y-2">
+      <main className="w-full max-w-2xl space-y-8 flex-grow">
+        <header className="text-center space-y-2 pt-8 sm:pt-12">
           <h1 className="text-5xl sm:text-6xl font-bold text-primary tracking-tight">VoiceMax</h1>
           <p className="text-lg sm:text-xl text-muted-foreground">
             Uncover the emotions in your voice. Gain insights, get feedback.
@@ -154,7 +154,7 @@ export default function VoiceMaxPage() {
         )}
 
         {!isLoading && analysisResult && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6 animate-fadeIn pb-8">
             <EmotionDisplay emotion={analysisResult.primaryEmotion} />
             <DetailedObservations
               stressLevel={analysisResult.perceivedStressLevel}
@@ -177,6 +177,9 @@ export default function VoiceMaxPage() {
         )}
         
       </main>
+      <footer className="w-full max-w-2xl text-center py-6 text-sm text-muted-foreground">
+        <p>An Initiative from Hackaburg 2025 | Team 2.1</p>
+      </footer>
       
       <style jsx global>{`
         .animate-fadeIn {
