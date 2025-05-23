@@ -84,29 +84,24 @@ body {
     @apply bg-background text-foreground; /* Tailwind class providing base background color */
     min-height: 100vh;
     
-    /* Added for wave animation */
-    background-image: linear-gradient(
-      135deg, 
-      hsl(203, 29%, 16%), /* Slightly darker shade of background */
-      hsl(var(--background)),
-      hsl(203, 29%, 21%), /* Slightly lighter shade of background */
-      hsl(var(--background)),
-      hsl(203, 29%, 16%)
-    );
-    background-size: 300% 300%; /* Large size for smooth animation */
-    animation: waveBackground 25s ease infinite;
+    /* Added for moving grid animation */
+    --grid-color: hsl(var(--primary) / 0.05); /* Subtle grid line color */
+    --grid-size: 60px; /* Size of the grid cells */
+    background-image:
+      linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+    background-size: var(--grid-size) var(--grid-size);
+    animation: movingGrid 30s linear infinite;
   }
 }
 
-/* Added for wave animation */
-@keyframes waveBackground {
+/* Added for moving grid animation */
+@keyframes movingGrid {
   0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
+    background-position: 0 0;
   }
   100% {
-    background-position: 0% 50%;
+    /* Animate to a position that is a multiple of the grid size for seamless looping */
+    background-position: var(--grid-size) var(--grid-size);
   }
 }
