@@ -162,7 +162,7 @@ export default function VoiceMaxPage() {
         
       </main>
       <footer className="text-center mt-12 text-sm text-muted-foreground/70">
-        <p>&copy; {new Date().getFullYear()} VoiceMax. Powered by Genkit AI.</p>
+        
       </footer>
       <style jsx global>{`
         .animate-fadeIn {
