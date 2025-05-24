@@ -1,4 +1,3 @@
-
 # VoiceMax - Voice that states your mental health
 
 VoiceMax is a web application designed to help users gain insights into their emotional state by analyzing the nuances in their voice. Record your voice, and let our AI provide you with an understanding of your primary emotion, suggest other potential underlying feelings, and offer personalized feedback.
